@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="message-box">
+    <h2>Chat Room: {{ room }}</h2>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="input">
+        <input 
+            type="text" 
+            rows="3" 
+            placeholder="Message" 
+            name="message" 
+            id="message"
+        />
+        <button type="button" name="send" id="send-btn" onClick="sendMessage()">
+            Send
+        </button>
+    </div>    
+</div>
+
+<script type="text/javascript">
+    var socketio = io();
+
+    // Get the messages container element
+    const messages = document.getElementById("messages");
+
+    // Function to create and display a new message in the chat window
+    const createMessage = (name, msg) => {
+        const content = `
+            <div class="text">
+                <span>
+                    <strong>${name}</strong>: ${msg}
+                </span>
+                <span class="muted">
+                    ${new Date().toLocaleDateString()}
+                </span>
+            </div>
+        `;
+        messages.innerHTML += content;
+    };
+
+    // Listen for incoming messages from the server
+    socketio.on("message", (data) => {
+        createMessage(data.name, data.message);
+    });
+
+    // Function to send the message to the server when the user clicks "Send"
+    const sendMessage = () => {
+        const messageInput = document.getElementById("message");
+        if (messageInput.value == "") return;
+        socketio.emit("message", { data: messageInput.value });
+        messageInput.value = ""; // Clear the input after sending
+    };
+</script>
+{% endblock %}
