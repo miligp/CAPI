@@ -1,0 +1,14 @@
+{
+    "admin": "Pierre",
+    "members": 0,
+    "messages": [
+        {
+            "name": "Mat",
+            "message": "Bonjour"
+        },
+        {
+            "name": "Pierre",
+            "message": "Aurevoir"
+        }
+    ]
+}

@@ -1,10 +1,20 @@
 {% extends 'base.html' %}
-
 {% block content %}
 <div class="message-box">
     <h2>Chat Room: {{ room }}</h2>
 
-    <div class="messages" id="messages"></div>
+    <div class="messages" id="messages">
+        {% for message in messages %}
+        <div class="text">
+            <span>
+                <strong>{{ message.name }}</strong>: {{ message.message }}
+            </span>
+            <span class="muted">
+                {{ message.date }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
 
     <div class="input">
         <input 

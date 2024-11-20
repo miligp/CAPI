@@ -1,25 +1,42 @@
 {% extends 'base.html' %}
+
 {% block content %}
-<form method="POST" class="buttons">
+<form method="POST" enctype="multipart/form-data" class="buttons">
     <h3>Enter The Chat Room</h3>
+
+    <!-- Name Field -->
     <div>
         <label>Name:</label>
         <input 
-        type="text" 
-        placeholder="Pick a name!" 
-        name="name" 
-        value="{{ name }}" 
+            type="text" 
+            placeholder="Pick a name!" 
+            name="name" 
+            value="{{ name }}" 
+            required
         />
     </div>
+
+    <!-- Join Room Section -->
     <div class="join">
-        <label>Room Code:</label>
-        <input type="text" placeholder="Room Code" name="code" value="{{ code }}" />
-        <button type="submit" name="join">Join a Room</button>
+        <label>Room Code (for joining):</label>
+        <input 
+            type="text" 
+            placeholder="Room Code" 
+            name="code" 
+            value="{{ code }}" 
+        />
+        <button type="submit" name="join" value="True">Join a Room</button>
     </div>
-    <button type="submit" name="create" class="create-btn">Create a Room</button>
-   {% if error%}
+
+    <!-- Create Room Button -->
+    <button type="submit" name="create" value="True" class="create-btn">
+        Create a Room
+    </button>
+
+    <!-- Error Display -->
+    {% if error %}
     <ul>
-        <li>{{error}}</li>
+        <li>{{ error }}</li>
     </ul>
     {% endif %}
 </form>

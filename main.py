@@ -1,25 +1,50 @@
-from flask import Flask, render_template, request, session, redirect, url_for
-from flask_socketio import join_room, leave_room, send, SocketIO
+import json
+import os
 import random
 from string import ascii_uppercase
+from flask import Flask, render_template, request, session, redirect, url_for
+from flask_socketio import join_room, leave_room, send, SocketIO
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "milina"
 socketio = SocketIO(app)
 
-rooms = {}
+# Directory for saving room data
+ROOMS_DIR = os.path.join(os.path.dirname(__file__), "rooms")
 
-def generate_unique_code(length):
+# Ensure the directory exists
+os.makedirs(ROOMS_DIR, exist_ok=True)
+
+# Load a specific room's data
+def load_room_data(room_code):
+    file_path = os.path.join(ROOMS_DIR, f"{room_code}.json")
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Invalid JSON in {file_path}: {e}")
+    return {"admin": None, "members": 0, "messages": []}
+
+# Save a specific room's data
+def save_room_data(room_code, data):
+    file_path = os.path.join(ROOMS_DIR, f"{room_code}.json")
+    try:
+        with open(file_path, 'w') as f:
+            json.dump(data, f, indent=4)
+        print(f"[INFO] Room data saved for {room_code}")
+    except Exception as e:
+        print(f"[ERROR] Failed to save room data for {room_code}: {e}")
+
+# Generate a unique room code
+def generate_unique_code(length=4):
     while True:
-        code = ""
-        for _ in range(length):  
-            code += random.choice(ascii_uppercase)
-
-        if code not in rooms: 
+        code = "".join(random.choice(ascii_uppercase) for _ in range(length))
+        if not os.path.exists(os.path.join(ROOMS_DIR, f"{code}.json")):
             break
     return code
 
-@app.route("/", methods =["POST","GET"])
+@app.route("/", methods=["POST", "GET"])
 def home():
     session.clear()
     if request.method == "POST":
@@ -31,66 +56,73 @@ def home():
         if not name:
             return render_template("home.html", error="Please enter a name.", code=code, name=name)
 
-        if join != False and not code:
+        if join and not code:
             return render_template("home.html", error="Please enter the room code.", code=code, name=name)
-        
-        room = code 
-        if create != False:
-            room = generate_unique_code(4)
-            rooms[room] = {"members": 0, "messages":[]}
-        elif code not in rooms:
+
+        room = code  # Default room code for join
+        if create:
+            room = generate_unique_code()
+            room_data = {"admin": name, "members": 0, "messages": []}
+            save_room_data(room, room_data)
+            print(f"[INFO] Room {room} created with admin {name}")
+        elif not os.path.exists(os.path.join(ROOMS_DIR, f"{room}.json")):
             return render_template("home.html", error="Room does not exist.", code=code, name=name)
 
-        session["room"] = room 
-        session["name"] = name 
+        session["room"] = room
+        session["name"] = name
         return redirect(url_for("room"))
-    
+
     return render_template("home.html")
 
 @app.route("/room")
 def room():
     room = session.get("room")
-    if room is None or session.get("name") is None or room not in rooms:
+    name = session.get("name")
+
+    if not room or not name or not os.path.exists(os.path.join(ROOMS_DIR, f"{room}.json")):
         return redirect(url_for("home"))
-    return render_template("room.html")
+
+    room_data = load_room_data(room)
+    return render_template("room.html", room=room, messages=room_data["messages"])
 
 @socketio.on("connect")
-def connect(): 
+def connect():
     room = session.get("room")
     name = session.get("name")
     if not room or not name:
         return
-    if room not in rooms:
-        leave_room(room)
-        return
 
+    room_data = load_room_data(room)
     join_room(room)
     send({"name": name, "message": "has entered the room"}, to=room)
-    rooms[room]["members"] += 1
-    print(f"{name} joined room {room}")
+    room_data["members"] += 1
+    save_room_data(room, room_data)
+    print(f"[INFO] {name} joined room {room}")
 
 @socketio.on("disconnect")
-def disconnect(): 
+def disconnect():
     room = session.get("room")
     name = session.get("name")
     leave_room(room)
 
-    if room in rooms: 
-        rooms[room]["members"] -= 1 
-        if rooms[room]["members"] <= 0:
-            del rooms[room]
-    send({"name": name, "message": "has left the room"}, to=room)       
-    print(f"{name} has left the room {room}")
+    if room:
+        room_data = load_room_data(room)
+        room_data["members"] -= 1
+        save_room_data(room, room_data)  # Don't delete the room data unless explicitly required.
+        send({"name": name, "message": "has left the room"}, to=room)
+        print(f"[INFO] {name} has left room {room}")
 
-@socketio.on('message')
+@socketio.on("message")
 def handle_message(data):
     room = session.get("room")
     name = session.get("name")
     if room and name:
-        message = data['data']
-        rooms[room]["messages"].append({"name": name, "message": message})
+        message = data["data"]
+        room_data = load_room_data(room)
+        room_data["messages"].append({"name": name, "message": message})
+        save_room_data(room, room_data)
         send({"name": name, "message": message}, to=room)
-        print(f"Message from {name} in {room}: {message}")
+        print(f"[INFO] Message from {name} in {room}: {message}")
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)
