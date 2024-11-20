@@ -24,6 +24,8 @@ def load_room_data(room_code):
                 return json.load(f)
         except json.JSONDecodeError as e:
             print(f"[ERROR] Invalid JSON in {file_path}: {e}")
+    else:
+        print(f"[ERROR] Room file {file_path} does not exist.")
     return {"admin": None, "members": 0, "messages": []}
 
 # Save a specific room's data
@@ -66,6 +68,7 @@ def home():
             save_room_data(room, room_data)
             print(f"[INFO] Room {room} created with admin {name}")
         elif not os.path.exists(os.path.join(ROOMS_DIR, f"{room}.json")):
+            print(f"[ERROR] Room {room} does not exist.")
             return render_template("home.html", error="Room does not exist.", code=code, name=name)
 
         session["room"] = room
@@ -80,6 +83,7 @@ def room():
     name = session.get("name")
 
     if not room or not name or not os.path.exists(os.path.join(ROOMS_DIR, f"{room}.json")):
+        print(f"[ERROR] Room {room} does not exist or is not valid.")
         return redirect(url_for("home"))
 
     room_data = load_room_data(room)
@@ -92,12 +96,18 @@ def connect():
     if not room or not name:
         return
 
-    room_data = load_room_data(room)
+    room_data = load_room_data(room)  # Charger les données de la room
     join_room(room)
     send({"name": name, "message": "has entered the room"}, to=room)
-    room_data["members"] += 1
-    save_room_data(room, room_data)
+    
+    room_data["members"] += 1  # Incrémenter le nombre de membres
+    save_room_data(room, room_data)  # Sauvegarder les données mises à jour
+
+    admin_name = room_data["admin"]  # Récupérer le nom de l'admin
+    send({"name": "System", "message": f"The admin of this room is {admin_name}."}, to=room)  # Envoyer un message avec l'admin
+    print(f"[INFO]{admin_name} is the admin of the room {room}")
     print(f"[INFO] {name} joined room {room}")
+    
 
 @socketio.on("disconnect")
 def disconnect():
