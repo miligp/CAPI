@@ -3,7 +3,7 @@ import os
 import random
 from string import ascii_uppercase
 from flask import Flask, render_template, request, session, redirect, url_for
-from flask_socketio import join_room, leave_room, send, SocketIO
+from flask_socketio import join_room, leave_room, send, SocketIO, emit
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "milina"
@@ -27,7 +27,7 @@ def load_room_data(room_code):
             print(f"[ERROR] Invalid JSON in {file_path}: {e}")
     else:
         print(f"[ERROR] Room file {file_path} does not exist.")
-    return {"admin": None, "members": 0, "messages": []}
+    return {"admin": None, "members": 0, "messages": [], "button_activated": False}
 
 
 # Save a specific room's data
@@ -56,6 +56,8 @@ def home():
     if request.method == "POST":
         name = request.form.get("name")
         code = request.form.get("code")
+        title = request.form.get("title")  # Capture the meeting title
+        mode = request.form.get("mode")  # Capture the game mode
         join = request.form.get("join", False)
         create = request.form.get("create", False)
 
@@ -68,9 +70,17 @@ def home():
         room = code  # Default room code for join
         if create:
             room = generate_unique_code()
-            room_data = {"admin": name, "members": 0, "messages": []}
+            # Save the meeting title and mode in the room data
+            room_data = {
+                "admin": name,
+                "members": 0,
+                "messages": [],
+                "meeting_title": title or "Untitled Meeting",  # Default if no title provided
+                "mode": mode,
+                "button_activated": False  # Initialize button state
+            }
             save_room_data(room, room_data)
-            print(f"[INFO] Room {room} created with admin {name}")
+            print(f"[INFO] Room {room} created with admin {name}, title '{title}', and mode '{mode}'")
         elif not os.path.exists(os.path.join(ROOMS_DIR, f"{room}.json")):
             print(f"[ERROR] Room {room} does not exist.")
             return render_template("home.html", error="Room does not exist.", code=code, name=name)
@@ -79,10 +89,8 @@ def home():
         session["name"] = name
 
         # Pass the room code when redirecting
-        return redirect(url_for("room", room_code=room))
+        return redirect(url_for("room"))
     return render_template("home.html")
-
-
 
 
 @app.route("/room")
@@ -93,9 +101,19 @@ def room():
     if not room or not name:
         return redirect(url_for("home"))
 
-    # Load room data, including previous messages
+    # Load room data, including the meeting title
     room_data = load_room_data(room)
-    return render_template("room.html", room=room, messages=room_data["messages"], name=name)
+    meeting_title = room_data.get("meeting_title", "Untitled Meeting")  # Default if missing
+
+    return render_template(
+        "room.html",
+        room=room,
+        messages=room_data["messages"],
+        name=name,
+        meeting_title=meeting_title,
+        is_admin=(name == room_data["admin"]),
+        button_activated=room_data.get("button_activated", False)  # Pass button state
+    )
 
 
 @socketio.on("connect")
@@ -105,15 +123,15 @@ def connect():
     if not room or not name:
         return
     
-    room_data = load_room_data(room)  # Charger les données de la room
+    room_data = load_room_data(room)  # Load room data
     join_room(room)
     send({"name": name, "message": "has entered the room"}, to=room)
     
-    room_data["members"] += 1  # Incrémenter le nombre de membres
-    save_room_data(room, room_data)  # Sauvegarder les données mises à jour
+    room_data["members"] += 1  # Increment member count
+    save_room_data(room, room_data)  # Save updated data
 
-    admin_name = room_data["admin"]  # Récupérer le nom de l'admin
-    send({"name": "System", "message": f"The admin of this room is {admin_name}."}, to=room)  # Envoyer un message avec l'admin
+    admin_name = room_data["admin"]  # Get the admin name
+    send({"name": "System", "message": f"The admin of this room is {admin_name}."}, to=room)  # Notify users about admin
     print(f"[INFO]{admin_name} is the admin of the room {room}")
     print(f"[INFO] {name} joined room {room}")
 
@@ -127,7 +145,7 @@ def disconnect():
     if room:
         room_data = load_room_data(room)
         room_data["members"] -= 1
-        save_room_data(room, room_data)  # Don't delete the room data unless explicitly required.
+        save_room_data(room, room_data)  # Save updated data
         send({"name": name, "message": "has left the room"}, to=room)
         print(f"[INFO] {name} has left room {room}")
 
@@ -143,6 +161,26 @@ def handle_message(data):
         save_room_data(room, room_data)
         send({"name": name, "message": message}, to=room)
         print(f"[INFO] Message from {name} in {room}: {message}")
+
+
+@socketio.on("activate_button")
+def activate_button(data):
+    room = session.get("room")
+    name = session.get("name")
+    if not room or not name:
+        return
+
+    # Load room data
+    room_data = load_room_data(room)
+
+    # Only the admin can activate the button
+    if name == room_data["admin"]:
+        room_data["button_activated"] = True
+        save_room_data(room, room_data)
+
+        # Notify everyone in the room that the button is activated
+        socketio.emit("button_activated", {"room": room}, to=room)
+        print(f"[INFO] Admin {name} activated the button in room {room}")
 
 
 if __name__ == "__main__":

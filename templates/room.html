@@ -3,6 +3,15 @@
 {% block content %}
 <div class="message-box">
     <h2>Chat Room: {{ room }}</h2>
+    <h3>Meeting Title: {{ meeting_title }}</h3>
+
+    <!-- Admin-only button to activate the second button -->
+    {% if is_admin %}
+    <button id="activate-btn" onclick="activateButton()">Activate the Button</button>
+    {% endif %}
+
+    <!-- Second button visible to everyone after activation -->
+    <button id="action-btn" style="display: {{ 'block' if button_activated else 'none' }};" onclick="performAction()">Click Me!</button>
 
     <!-- Chat Messages -->
     <div id="messages" style="border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px;">
@@ -13,24 +22,47 @@
         {% endfor %}
     </div>
 
-    <!-- Message Input Box -->
+    <!-- Message Input -->
     <div style="margin-top: 10px;">
         <input type="text" id="message" placeholder="Type your message..." style="width: 80%;" />
         <button type="button" id="send-btn" style="width: 18%;" onclick="sendMessage()">Send</button>
     </div>
 </div>
 
-<!-- SocketIO script -->
 <script type="text/javascript">
     var socket = io();
-
     var room = "{{ room }}";
     var name = "{{ name }}";
 
-    // Automatically join the room upon loading the page
+    // Join the room
     socket.emit('join', {room: room, name: name});
 
-    // Listen for incoming messages from the server
+    // Listen for the button activation event
+    socket.on("button_activated", function(data) {
+        const actionBtn = document.getElementById("action-btn");
+        actionBtn.style.display = "block"; // Show the button when activated
+    });
+
+    // Function for admin to activate the button
+    function activateButton() {
+        socket.emit("activate_button", {room: room});
+    }
+
+    // Function for everyone to perform an action with the second button
+    function performAction() {
+        alert("Button clicked!");
+    }
+
+    // Function to send a message
+    function sendMessage() {
+        const messageInput = document.getElementById("message");
+        if (messageInput.value.trim() !== "") {
+            socket.emit('message', {data: messageInput.value});
+            messageInput.value = "";  // Clear the input after sending
+        }
+    }
+
+    // Listen for incoming messages
     socket.on("message", function(data) {
         const messagesDiv = document.getElementById("messages");
         const newMessage = document.createElement("div");
@@ -38,17 +70,8 @@
         newMessage.innerHTML = `<strong>${data.name}</strong>: ${data.message}`;
         messagesDiv.appendChild(newMessage);
 
-        // Auto scroll to the bottom
+        // Auto-scroll to the bottom
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
-
-    // Function to send a message
-    function sendMessage() {
-        const messageInput = document.getElementById("message");
-        if (messageInput.value.trim() !== "") {
-            socket.emit('message', {data: messageInput.value});
-            messageInput.value = ""; // Clear the input after sending
-        }
-    }
 </script>
 {% endblock %}
