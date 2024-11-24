@@ -183,5 +183,87 @@ def activate_button(data):
         print(f"[INFO] Admin {name} activated the button in room {room}")
 
 
+@app.route("/vote", methods=["POST", "GET"])
+def vote():
+    room = session.get("room")
+    name = session.get("name")
+
+    if not room or not name:
+        return redirect(url_for("home"))
+
+    room_data = load_room_data(room)
+    admin = room_data["admin"]
+
+    if request.method == "POST":
+        # Admin sets the task title
+        if name == admin:
+            task_title = request.form.get("task_title")
+            room_data["current_task"] = {"title": task_title, "votes": []}
+            save_room_data(room, room_data)
+
+    task = room_data.get("current_task", {"title": "No task set", "votes": []})
+    return render_template(
+        "vote.html",
+        room=room,
+        name=name,
+        task=task,
+        is_admin=(name == admin)
+    )
+
+
+@socketio.on("start_vote")
+def start_vote(data):
+    room = session.get("room")
+    name = session.get("name")
+
+    room_data = load_room_data(room)
+    admin = room_data["admin"]
+
+    if name == admin:
+        # Notify all users that voting has started
+        socketio.emit("voting_started", {"task": room_data.get("current_task")}, to=room)
+
+
+@socketio.on("submit_vote")
+def submit_vote(data):
+    room = session.get("room")
+    name = session.get("name")
+
+    vote = data.get("vote")
+    room_data = load_room_data(room)
+
+    # Add user's vote to the current task
+    if "current_task" in room_data:
+        room_data["current_task"]["votes"].append({"name": name, "vote": vote})
+        save_room_data(room, room_data)
+        print(f"[INFO] {name} voted: {vote}")
+
+    # Broadcast the updated votes to everyone
+    socketio.emit("vote_submitted", {"votes": room_data["current_task"]["votes"]}, to=room)
+
+
+@socketio.on("stop_vote")
+def stop_vote(data):
+    room = session.get("room")
+    name = session.get("name")
+
+    room_data = load_room_data(room)
+    votes = room_data.get("current_task", {}).get("votes", [])
+
+    if name == room_data["admin"]:
+        # Calculate lowest and highest votes
+        if votes:
+            sorted_votes = sorted(votes, key=lambda x: x["vote"])
+            lowest = sorted_votes[0]
+            highest = sorted_votes[-1]
+
+            # Notify all users of the results
+            socketio.emit(
+                "voting_results",
+                {"lowest": lowest, "highest": highest, "votes": votes},
+                to=room
+            )
+
+
 if __name__ == "__main__":
     socketio.run(app, debug=True)

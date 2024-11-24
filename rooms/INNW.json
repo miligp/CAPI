@@ -1,0 +1,21 @@
+{
+    "admin": "milena",
+    "members": 2,
+    "messages": [],
+    "meeting_title": "Springjki",
+    "mode": "unanimity",
+    "button_activated": true,
+    "current_task": {
+        "title": "Write a text",
+        "votes": [
+            {
+                "name": "milena",
+                "vote": 8
+            },
+            {
+                "name": "ilyna",
+                "vote": 2
+            }
+        ]
+    }
+}
