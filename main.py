@@ -15,6 +15,7 @@ ROOMS_DIR = os.path.join(os.path.dirname(__file__), "rooms")
 # Ensure the directory exists
 os.makedirs(ROOMS_DIR, exist_ok=True)
 
+
 # Load a specific room's data
 def load_room_data(room_code):
     file_path = os.path.join(ROOMS_DIR, f"{room_code}.json")
@@ -28,6 +29,7 @@ def load_room_data(room_code):
         print(f"[ERROR] Room file {file_path} does not exist.")
     return {"admin": None, "members": 0, "messages": []}
 
+
 # Save a specific room's data
 def save_room_data(room_code, data):
     file_path = os.path.join(ROOMS_DIR, f"{room_code}.json")
@@ -38,6 +40,7 @@ def save_room_data(room_code, data):
     except Exception as e:
         print(f"[ERROR] Failed to save room data for {room_code}: {e}")
 
+
 # Generate a unique room code
 def generate_unique_code(length=4):
     while True:
@@ -45,6 +48,7 @@ def generate_unique_code(length=4):
         if not os.path.exists(os.path.join(ROOMS_DIR, f"{code}.json")):
             break
     return code
+
 
 @app.route("/", methods=["POST", "GET"])
 def home():
@@ -73,21 +77,26 @@ def home():
 
         session["room"] = room
         session["name"] = name
-        return redirect(url_for("room"))
 
+        # Pass the room code when redirecting
+        return redirect(url_for("room", room_code=room))
     return render_template("home.html")
+
+
+
 
 @app.route("/room")
 def room():
     room = session.get("room")
     name = session.get("name")
 
-    if not room or not name or not os.path.exists(os.path.join(ROOMS_DIR, f"{room}.json")):
-        print(f"[ERROR] Room {room} does not exist or is not valid.")
+    if not room or not name:
         return redirect(url_for("home"))
 
+    # Load room data, including previous messages
     room_data = load_room_data(room)
-    return render_template("room.html", room=room, messages=room_data["messages"])
+    return render_template("room.html", room=room, messages=room_data["messages"], name=name)
+
 
 @socketio.on("connect")
 def connect():
@@ -95,7 +104,7 @@ def connect():
     name = session.get("name")
     if not room or not name:
         return
-
+    
     room_data = load_room_data(room)  # Charger les données de la room
     join_room(room)
     send({"name": name, "message": "has entered the room"}, to=room)
@@ -107,7 +116,7 @@ def connect():
     send({"name": "System", "message": f"The admin of this room is {admin_name}."}, to=room)  # Envoyer un message avec l'admin
     print(f"[INFO]{admin_name} is the admin of the room {room}")
     print(f"[INFO] {name} joined room {room}")
-    
+
 
 @socketio.on("disconnect")
 def disconnect():
@@ -122,6 +131,7 @@ def disconnect():
         send({"name": name, "message": "has left the room"}, to=room)
         print(f"[INFO] {name} has left room {room}")
 
+
 @socketio.on("message")
 def handle_message(data):
     room = session.get("room")
@@ -133,6 +143,7 @@ def handle_message(data):
         save_room_data(room, room_data)
         send({"name": name, "message": message}, to=room)
         print(f"[INFO] Message from {name} in {room}: {message}")
+
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)

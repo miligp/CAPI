@@ -1,67 +1,54 @@
 {% extends 'base.html' %}
+
 {% block content %}
 <div class="message-box">
     <h2>Chat Room: {{ room }}</h2>
 
-    <div class="messages" id="messages">
+    <!-- Chat Messages -->
+    <div id="messages" style="border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px;">
         {% for message in messages %}
-        <div class="text">
-            <span>
-                <strong>{{ message.name }}</strong>: {{ message.message }}
-            </span>
-            <span class="muted">
-                {{ message.date }}
-            </span>
+        <div class="message">
+            <strong>{{ message.name }}</strong>: {{ message.message }}
         </div>
         {% endfor %}
     </div>
 
-    <div class="input">
-        <input 
-            type="text" 
-            rows="3" 
-            placeholder="Message" 
-            name="message" 
-            id="message"
-        />
-        <button type="button" name="send" id="send-btn" onClick="sendMessage()">
-            Send
-        </button>
-    </div>    
+    <!-- Message Input Box -->
+    <div style="margin-top: 10px;">
+        <input type="text" id="message" placeholder="Type your message..." style="width: 80%;" />
+        <button type="button" id="send-btn" style="width: 18%;" onclick="sendMessage()">Send</button>
+    </div>
 </div>
 
+<!-- SocketIO script -->
 <script type="text/javascript">
-    var socketio = io();
+    var socket = io();
 
-    // Get the messages container element
-    const messages = document.getElementById("messages");
+    var room = "{{ room }}";
+    var name = "{{ name }}";
 
-    // Function to create and display a new message in the chat window
-    const createMessage = (name, msg) => {
-        const content = `
-            <div class="text">
-                <span>
-                    <strong>${name}</strong>: ${msg}
-                </span>
-                <span class="muted">
-                    ${new Date().toLocaleDateString()}
-                </span>
-            </div>
-        `;
-        messages.innerHTML += content;
-    };
+    // Automatically join the room upon loading the page
+    socket.emit('join', {room: room, name: name});
 
     // Listen for incoming messages from the server
-    socketio.on("message", (data) => {
-        createMessage(data.name, data.message);
+    socket.on("message", function(data) {
+        const messagesDiv = document.getElementById("messages");
+        const newMessage = document.createElement("div");
+        newMessage.classList.add("message");
+        newMessage.innerHTML = `<strong>${data.name}</strong>: ${data.message}`;
+        messagesDiv.appendChild(newMessage);
+
+        // Auto scroll to the bottom
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
 
-    // Function to send the message to the server when the user clicks "Send"
-    const sendMessage = () => {
+    // Function to send a message
+    function sendMessage() {
         const messageInput = document.getElementById("message");
-        if (messageInput.value == "") return;
-        socketio.emit("message", { data: messageInput.value });
-        messageInput.value = ""; // Clear the input after sending
-    };
+        if (messageInput.value.trim() !== "") {
+            socket.emit('message', {data: messageInput.value});
+            messageInput.value = ""; // Clear the input after sending
+        }
+    }
 </script>
 {% endblock %}

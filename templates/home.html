@@ -1,8 +1,6 @@
-{% extends 'base.html' %}
-
 {% block content %}
 <form method="POST" enctype="multipart/form-data" class="buttons">
-    <h3>Enter The Chat Room</h3>
+    <h3>Create or Join a Room</h3>
 
     <!-- Name Field -->
     <div>
@@ -26,6 +24,26 @@
             value="{{ code }}" 
         />
         <button type="submit" name="join" value="True">Join a Room</button>
+    </div>
+
+    <!-- Title of the Meeting -->
+    <div class="create">
+        <label>Meeting Title:</label>
+        <input 
+            type="text" 
+            placeholder="Meeting Title" 
+            name="title" 
+        />
+    </div>
+
+    <!-- Mode Selection -->
+    <div class="create">
+        <label>Select Game Mode:</label>
+        <select name="mode" required>
+            <option value="unanimity">Unanimity</option>
+            <option value="average">Average</option>
+            <option value="majority">Majority</option>
+        </select>
     </div>
 
     <!-- Create Room Button -->
