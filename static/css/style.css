@@ -1,0 +1,58 @@
+.content {
+    display: flex;
+    align-items: center; /* Corrected typo */
+    justify-content: center;
+}
+
+.buttons {
+    display: flex; 
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; 
+}
+
+.join {
+    display: flex;
+    flex-direction: row;
+    width: 100%; 
+}
+
+.create-btn {
+    width: 100%;
+}
+
+.message-box {
+    border-color: black;
+    border-width: 2px;
+    border-style: solid;
+    border-radius: 10px;
+    background-color: whitesmoke;
+    height: 80vh; 
+    display: flex;
+    flex-direction: column;
+    width: 80vw; 
+    align-items: stretch;
+}
+
+.messages {
+    overflow-y: scroll;
+    flex: 1; 
+    width: 100%;
+    max-height: 70vh;  /* Ensure the height limit for scrolling */
+    padding: 10px;      /* Add padding inside the messages box */
+}
+
+.inputs {
+    padding: 10px; 
+    display: flex;
+    gap: 10px;          /* Add some space between input and button */
+}
+
+h2 {
+    text-align: center;
+}
+
+#message {
+    flex: 1;
+}
