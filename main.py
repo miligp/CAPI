@@ -210,40 +210,31 @@ def vote():
         is_admin=(name == admin)
     )
 
-
-@socketio.on("start_vote")
-def start_vote(data):
-    room = session.get("room")
-    name = session.get("name")
-
-    room_data = load_room_data(room)
-    admin = room_data["admin"]
-
-    if name == admin:
-        # Notify all users that voting has started
-        socketio.emit("voting_started", {"task": room_data.get("current_task")}, to=room)
-
-
 @socketio.on("submit_vote")
 def submit_vote(data):
     room = session.get("room")
     name = session.get("name")
-
     vote = data.get("vote")
+
     room_data = load_room_data(room)
 
-    # Add user's vote to the current task
+    # Vérifier si l'utilisateur a déjà voté
     if "current_task" in room_data:
-        room_data["current_task"]["votes"].append({"name": name, "vote": vote})
+        current_task = room_data["current_task"]
+
+        if any(v["name"] == name for v in current_task["votes"]):
+            socketio.emit("vote_error", {"message": "Vous avez déjà voté."}, to=request.sid)
+            return
+
+        # Ajouter le vote
+        current_task["votes"].append({"name": name, "vote": vote})
         save_room_data(room, room_data)
-        print(f"[INFO] {name} voted: {vote}")
 
-    # Broadcast the updated votes to everyone
-    socketio.emit("vote_submitted", {"votes": room_data["current_task"]["votes"]}, to=room)
-
+        # Diffuser le vote pour désactiver les boutons de l'utilisateur actuel
+        socketio.emit("vote_submitted", {"name": name, "vote": vote}, to=room)
 
 @socketio.on("stop_vote")
-def stop_vote(data):
+def stop_vote(data=None):  # Accepter un argument optionnel
     room = session.get("room")
     name = session.get("name")
 
@@ -251,18 +242,39 @@ def stop_vote(data):
     votes = room_data.get("current_task", {}).get("votes", [])
 
     if name == room_data["admin"]:
-        # Calculate lowest and highest votes
+        # Calculer les votes les plus bas et les plus élevés
         if votes:
             sorted_votes = sorted(votes, key=lambda x: x["vote"])
             lowest = sorted_votes[0]
             highest = sorted_votes[-1]
 
-            # Notify all users of the results
+            # Diffuser les résultats à tous les utilisateurs
             socketio.emit(
                 "voting_results",
-                {"lowest": lowest, "highest": highest, "votes": votes},
+                {"lowest": lowest, "highest": highest},
                 to=room
             )
+
+@socketio.on("reset_vote")
+def reset_vote(data=None):  # Ajoutez un argument pour éviter l'erreur
+    room = session.get("room")
+    name = session.get("name")
+
+    room_data = load_room_data(room)
+
+    # Vérifier si l'utilisateur est l'admin
+    if name != room_data["admin"]:
+        socketio.emit("vote_error", {"message": "Seul l'admin peut recommencer le vote."}, to=request.sid)
+        return
+
+    # Réinitialiser les votes et cacher les résultats
+    if "current_task" in room_data:
+        room_data["current_task"]["votes"] = []  # Effacer tous les votes
+        save_room_data(room, room_data)
+
+        # Diffuser la réinitialisation à tous les utilisateurs
+        socketio.emit("vote_reset", {}, to=room)
+        print(f"[INFO] L'admin {name} a réinitialisé le vote dans la room {room}.")
 
 
 if __name__ == "__main__":

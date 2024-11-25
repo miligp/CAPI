@@ -17,14 +17,14 @@
         <h4>Vote:</h4>
         <div id="cards">
             {% for value in [1, 2, 3, 5, 8, 13, 21] %}
-            <button onclick="submitVote({{ value }})">{{ value }}</button>
+            <button id="vote-btn-{{ value }}" onclick="submitVote({{ value }})">{{ value }}</button>
             {% endfor %}
         </div>
     </div>
 
     {% if is_admin %}
-    <button id="start-vote-btn" onclick="startVote()">Start Vote</button>
     <button id="stop-vote-btn" onclick="stopVote()">Stop Vote</button>
+    <button id="reset-vote-btn" onclick="resetVote()">Recommencer le vote</button>
     {% endif %}
 
     <div id="results" style="display: none;">
@@ -36,23 +36,54 @@
 
 <script type="text/javascript">
     var socket = io();
+    var hasVoted = false; // Suivi local pour l'utilisateur actuel
 
+    // Fonction pour soumettre un vote
     function submitVote(value) {
-        socket.emit("submit_vote", {vote: value});
+        if (hasVoted) {
+            alert("Vous avez déjà voté !");
+            return;
+        }
+        socket.emit("submit_vote", { vote: value }); // Syntaxe correcte pour émettre un événement avec un objet
     }
 
-    function startVote() {
-        socket.emit("start_vote", {});
-    }
+    // Désactiver les boutons pour l'utilisateur ayant voté
+    socket.on("vote_submitted", function(data) {
+        if (data.name === "{{ name }}") {
+            hasVoted = true;
+            const buttons = document.querySelectorAll("#cards button");
+            buttons.forEach(button => button.disabled = true); // Désactiver tous les boutons
+        }
+    });
 
+    // Réactiver les boutons et effacer les résultats après une réinitialisation
+    socket.on("vote_reset", function() {
+        hasVoted = false;
+        const buttons = document.querySelectorAll("#cards button");
+        buttons.forEach(button => button.disabled = false); // Réactiver tous les boutons
+        document.getElementById("results").style.display = "none"; // Cacher les résultats
+        document.getElementById("lowest").innerText = "";
+        document.getElementById("highest").innerText = "";
+    });
+
+    // Fonction pour arrêter le vote (admin uniquement)
     function stopVote() {
-        socket.emit("stop_vote", {});
+        socket.emit("stop_vote", {}); // Syntaxe correcte pour envoyer un objet vide
     }
 
+    // Fonction pour recommencer le vote (admin uniquement)
+    function resetVote() {
+    if (confirm("Êtes-vous sûr de vouloir recommencer le vote ? Tous les résultats et votes seront effacés.")) {
+        socket.emit("reset_vote", {}); }
+    }
+    
+
+    // Afficher les résultats du vote
     socket.on("voting_results", function(data) {
         document.getElementById("results").style.display = "block";
         document.getElementById("lowest").innerText = `Lowest: ${data.lowest.name} (${data.lowest.vote})`;
         document.getElementById("highest").innerText = `Highest: ${data.highest.name} (${data.highest.vote})`;
     });
 </script>
+
 {% endblock %}

@@ -1,20 +1,20 @@
 {
-    "admin": "milena",
+    "admin": "P1",
     "members": 2,
     "messages": [],
-    "meeting_title": "Springjki",
+    "meeting_title": "DE",
     "mode": "unanimity",
     "button_activated": true,
     "current_task": {
         "title": "Write a text",
         "votes": [
             {
-                "name": "milena",
+                "name": "P1",
                 "vote": 8
             },
             {
-                "name": "ilyna",
-                "vote": 2
+                "name": "P2",
+                "vote": 8
             }
         ]
     }
