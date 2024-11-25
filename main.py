@@ -183,5 +183,139 @@ def activate_button(data):
         print(f"[INFO] Admin {name} activated the button in room {room}")
 
 
+@app.route("/vote", methods=["POST", "GET"])
+def vote():
+    room = session.get("room")
+    name = session.get("name")
+
+    if not room or not name:
+        return redirect(url_for("home"))
+
+    room_data = load_room_data(room)
+    admin = room_data["admin"]
+
+    if request.method == "POST":
+        # Admin sets the task title
+        if name == admin:
+            task_title = request.form.get("task_title")
+            room_data["current_task"] = {"title": task_title, "votes": []}
+            save_room_data(room, room_data)
+
+    task = room_data.get("current_task", {"title": "No task set", "votes": []})
+    return render_template(
+        "vote.html",
+        room=room,
+        name=name,
+        task=task,
+        is_admin=(name == admin)
+    )
+
+@socketio.on("submit_vote")
+def submit_vote(data):
+    room = session.get("room")
+    name = session.get("name")
+    vote = data.get("vote")
+
+    room_data = load_room_data(room)
+
+    # Vérifier si l'utilisateur a déjà voté
+    if "current_task" in room_data:
+        current_task = room_data["current_task"]
+
+        if any(v["name"] == name for v in current_task["votes"]):
+            socketio.emit("vote_error", {"message": "Vous avez déjà voté."}, to=request.sid)
+            return
+
+        # Ajouter le vote
+        current_task["votes"].append({"name": name, "vote": vote})
+        save_room_data(room, room_data)
+
+        # Diffuser le vote pour désactiver les boutons de l'utilisateur actuel
+        socketio.emit("vote_submitted", {"name": name, "vote": vote}, to=room)
+
+@socketio.on("stop_vote")
+def stop_vote(data=None):
+    room = session.get("room")
+    name = session.get("name")
+
+    room_data = load_room_data(room)
+    votes = room_data.get("current_task", {}).get("votes", [])
+
+    if name == room_data["admin"]:
+        if not votes:
+            socketio.emit("vote_error", {"message": "Aucun vote n'a été soumis."}, to=request.sid)
+            return
+
+        # Vérifier si tous les joueurs ont voté la même chose
+        unique_votes = set(v["vote"] for v in votes)
+        if len(unique_votes) == 1:  # Tous les votes sont identiques
+            unanimous_vote = unique_votes.pop()
+            socketio.emit(
+                "voting_results",
+                {
+                    "unanimous": True,
+                    "vote": unanimous_vote
+                },
+                to=room
+            )
+        else:
+            # Calculer les votes les plus bas et les plus élevés
+            sorted_votes = sorted(votes, key=lambda x: x["vote"])
+            lowest = sorted_votes[0]
+            highest = sorted_votes[-1]
+
+            socketio.emit(
+                "voting_results",
+                {
+                    "unanimous": False,
+                    "lowest": {"name": lowest["name"], "vote": lowest["vote"]},
+                    "highest": {"name": highest["name"], "vote": highest["vote"]}
+                },
+                to=room
+            )
+
+
+@socketio.on("reset_vote")
+def reset_vote(data=None):  # Ajoutez un argument pour éviter l'erreur
+    room = session.get("room")
+    name = session.get("name")
+
+    room_data = load_room_data(room)
+
+    # Vérifier si l'utilisateur est l'admin
+    if name != room_data["admin"]:
+        socketio.emit("vote_error", {"message": "Seul l'admin peut recommencer le vote."}, to=request.sid)
+        return
+
+    # Réinitialiser les votes et cacher les résultats
+    if "current_task" in room_data:
+        room_data["current_task"]["votes"] = []  # Effacer tous les votes
+        save_room_data(room, room_data)
+
+        # Diffuser la réinitialisation à tous les utilisateurs
+        socketio.emit("vote_reset", {}, to=room)
+        print(f"[INFO] L'admin {name} a réinitialisé le vote dans la room {room}.")
+
+@socketio.on("new_task")
+def new_task(data):
+    room = session.get("room")
+    name = session.get("name")
+
+    room_data = load_room_data(room)
+
+    if name != room_data["admin"]:
+        socketio.emit("vote_error", {"message": "Seul l'admin peut créer une nouvelle tâche."}, to=request.sid)
+        return
+
+    # Définir une nouvelle tâche avec le titre fourni
+    task_title = data.get("title", "Nouvelle tâche")
+    room_data["current_task"] = {"title": task_title, "votes": []}
+    save_room_data(room, room_data)
+
+    # Informer tous les joueurs de la nouvelle tâche
+    socketio.emit("task_updated", {"title": task_title}, to=room)
+    print(f"[INFO] Nouvelle tâche définie par l'admin {name} : {task_title}")
+
+
 if __name__ == "__main__":
     socketio.run(app, debug=True)
