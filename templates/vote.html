@@ -28,9 +28,13 @@
     {% endif %}
 
     <div id="results" style="display: none;">
-        <h4>Results:</h4>
-        <p id="lowest"></p>
-        <p id="highest"></p>
+        <h4>Résultats :</h4>
+        <p id="unanimity-message" style="display: none;"></p>
+        <p id="lowest" style="display: none;"></p>
+        <p id="highest" style="display: none;"></p>
+        {% if is_admin %}
+        <button id="new-task-btn" style="display: none;" onclick="newTask()">Nouvelle tâche</button>
+        {% endif %}
     </div>
 </div>
 
@@ -44,7 +48,7 @@
             alert("Vous avez déjà voté !");
             return;
         }
-        socket.emit("submit_vote", { vote: value }); // Syntaxe correcte pour émettre un événement avec un objet
+        socket.emit("submit_vote", { vote: value }); // Envoyer le vote au serveur
     }
 
     // Désactiver les boutons pour l'utilisateur ayant voté
@@ -61,29 +65,75 @@
         hasVoted = false;
         const buttons = document.querySelectorAll("#cards button");
         buttons.forEach(button => button.disabled = false); // Réactiver tous les boutons
-        document.getElementById("results").style.display = "none"; // Cacher les résultats
-        document.getElementById("lowest").innerText = "";
-        document.getElementById("highest").innerText = "";
+
+        // Réinitialiser l'affichage des résultats
+        document.getElementById("results").style.display = "none";
+        document.getElementById("unanimity-message").style.display = "none";
+        document.getElementById("lowest").style.display = "none";
+        document.getElementById("highest").style.display = "none";
+        document.getElementById("new-task-btn").style.display = "none";
     });
 
     // Fonction pour arrêter le vote (admin uniquement)
     function stopVote() {
-        socket.emit("stop_vote", {}); // Syntaxe correcte pour envoyer un objet vide
+        socket.emit("stop_vote", {}); // Envoyer un événement pour arrêter le vote
     }
 
     // Fonction pour recommencer le vote (admin uniquement)
     function resetVote() {
-    if (confirm("Êtes-vous sûr de vouloir recommencer le vote ? Tous les résultats et votes seront effacés.")) {
-        socket.emit("reset_vote", {}); }
+        if (confirm("Êtes-vous sûr de vouloir recommencer le vote ? Tous les résultats et votes seront effacés.")) {
+            socket.emit("reset_vote", {}); // Envoyer un événement pour réinitialiser le vote
+        }
     }
-    
 
-    // Afficher les résultats du vote
+    // Afficher les résultats ou un message d'unanimité
     socket.on("voting_results", function(data) {
-        document.getElementById("results").style.display = "block";
-        document.getElementById("lowest").innerText = `Lowest: ${data.lowest.name} (${data.lowest.vote})`;
-        document.getElementById("highest").innerText = `Highest: ${data.highest.name} (${data.highest.vote})`;
+        const resultsDiv = document.getElementById("results");
+        const unanimityMessage = document.getElementById("unanimity-message");
+        const lowestResult = document.getElementById("lowest");
+        const highestResult = document.getElementById("highest");
+        const newTaskBtn = document.getElementById("new-task-btn");
+
+        resultsDiv.style.display = "block";
+
+        if (data.unanimous) {
+            // Afficher le message d'unanimité
+            unanimityMessage.style.display = "block";
+            unanimityMessage.innerText = `Les joueurs ont tous voté à l'unanimité : ${data.vote}`;
+
+            // Cacher les autres résultats
+            lowestResult.style.display = "none";
+            highestResult.style.display = "none";
+
+            // Afficher le bouton pour une nouvelle tâche
+            newTaskBtn.style.display = "block";
+        } else {
+            // Cacher le message d'unanimité
+            unanimityMessage.style.display = "none";
+
+            // Afficher les résultats habituels
+            lowestResult.style.display = "block";
+            highestResult.style.display = "block";
+            lowestResult.innerText = `Plus bas : ${data.lowest.name} (${data.lowest.vote})`;
+            highestResult.innerText = `Plus haut : ${data.highest.name} (${data.highest.vote})`;
+
+            // Cacher le bouton pour une nouvelle tâche
+            newTaskBtn.style.display = "none";
+        }
+    });
+
+    // Fonction pour créer une nouvelle tâche
+    function newTask() {
+        const taskTitle = prompt("Entrez le titre de la nouvelle tâche :");
+        if (taskTitle) {
+            socket.emit("new_task", { title: taskTitle }); // Envoyer un événement pour créer une nouvelle tâche
+        }
+    }
+
+    // Mise à jour de l'interface après la création d'une nouvelle tâche
+    socket.on("task_updated", function(data) {
+        alert(`Nouvelle tâche : ${data.title}`);
+        location.reload(); // Recharger la page pour redémarrer le processus
     });
 </script>
-
 {% endblock %}

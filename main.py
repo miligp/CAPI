@@ -234,7 +234,7 @@ def submit_vote(data):
         socketio.emit("vote_submitted", {"name": name, "vote": vote}, to=room)
 
 @socketio.on("stop_vote")
-def stop_vote(data=None):  # Accepter un argument optionnel
+def stop_vote(data=None):
     room = session.get("room")
     name = session.get("name")
 
@@ -242,18 +242,38 @@ def stop_vote(data=None):  # Accepter un argument optionnel
     votes = room_data.get("current_task", {}).get("votes", [])
 
     if name == room_data["admin"]:
-        # Calculer les votes les plus bas et les plus élevés
-        if votes:
+        if not votes:
+            socketio.emit("vote_error", {"message": "Aucun vote n'a été soumis."}, to=request.sid)
+            return
+
+        # Vérifier si tous les joueurs ont voté la même chose
+        unique_votes = set(v["vote"] for v in votes)
+        if len(unique_votes) == 1:  # Tous les votes sont identiques
+            unanimous_vote = unique_votes.pop()
+            socketio.emit(
+                "voting_results",
+                {
+                    "unanimous": True,
+                    "vote": unanimous_vote
+                },
+                to=room
+            )
+        else:
+            # Calculer les votes les plus bas et les plus élevés
             sorted_votes = sorted(votes, key=lambda x: x["vote"])
             lowest = sorted_votes[0]
             highest = sorted_votes[-1]
 
-            # Diffuser les résultats à tous les utilisateurs
             socketio.emit(
                 "voting_results",
-                {"lowest": lowest, "highest": highest},
+                {
+                    "unanimous": False,
+                    "lowest": {"name": lowest["name"], "vote": lowest["vote"]},
+                    "highest": {"name": highest["name"], "vote": highest["vote"]}
+                },
                 to=room
             )
+
 
 @socketio.on("reset_vote")
 def reset_vote(data=None):  # Ajoutez un argument pour éviter l'erreur
@@ -275,6 +295,26 @@ def reset_vote(data=None):  # Ajoutez un argument pour éviter l'erreur
         # Diffuser la réinitialisation à tous les utilisateurs
         socketio.emit("vote_reset", {}, to=room)
         print(f"[INFO] L'admin {name} a réinitialisé le vote dans la room {room}.")
+
+@socketio.on("new_task")
+def new_task(data):
+    room = session.get("room")
+    name = session.get("name")
+
+    room_data = load_room_data(room)
+
+    if name != room_data["admin"]:
+        socketio.emit("vote_error", {"message": "Seul l'admin peut créer une nouvelle tâche."}, to=request.sid)
+        return
+
+    # Définir une nouvelle tâche avec le titre fourni
+    task_title = data.get("title", "Nouvelle tâche")
+    room_data["current_task"] = {"title": task_title, "votes": []}
+    save_room_data(room, room_data)
+
+    # Informer tous les joueurs de la nouvelle tâche
+    socketio.emit("task_updated", {"title": task_title}, to=room)
+    print(f"[INFO] Nouvelle tâche définie par l'admin {name} : {task_title}")
 
 
 if __name__ == "__main__":

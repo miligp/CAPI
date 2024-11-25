@@ -1,8 +1,8 @@
 {
     "admin": "P1",
-    "members": 1,
+    "members": 2,
     "messages": [],
-    "meeting_title": "DE",
+    "meeting_title": "DEF",
     "mode": "unanimity",
     "button_activated": true,
     "current_task": {
@@ -10,11 +10,11 @@
         "votes": [
             {
                 "name": "P1",
-                "vote": 8
+                "vote": 3
             },
             {
                 "name": "P2",
-                "vote": 8
+                "vote": 3
             }
         ]
     }
