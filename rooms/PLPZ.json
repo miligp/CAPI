@@ -1,19 +1,15 @@
 {
-    "admin": "P1",
+    "admin": "Milena",
     "members": 2,
     "messages": [],
-    "meeting_title": "DEF",
+    "meeting_title": "Untitled Meeting",
     "mode": "unanimity",
     "button_activated": true,
     "current_task": {
-        "title": "Write a text",
+        "title": "Configurer un serveur",
         "votes": [
             {
-                "name": "P1",
-                "vote": 3
-            },
-            {
-                "name": "P2",
+                "name": "Ilyna",
                 "vote": 3
             }
         ]
