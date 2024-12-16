@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="vote-box">
+    <h2>Room: {{ room }}</h2>
+    <h3>Task: {{ task.title }}</h3>
+
+    {% if is_admin %}
+    <form method="POST">
+        <label for="task_title">Task Title:</label>
+        <input type="text" name="task_title" id="task_title" placeholder="Enter task title" required>
+        <button type="submit">Set Task</button>
+    </form>
+    {% endif %}
+
+    <div id="voting-section">
+        <h4>Vote:</h4>
+        <div id="cards">
+            {% for value in [1, 2, 3, 5, 8, 13, 21] %}
+            <button onclick="submitVote({{ value }})">{{ value }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if is_admin %}
+    <button id="start-vote-btn" onclick="startVote()">Start Vote</button>
+    <button id="stop-vote-btn" onclick="stopVote()">Stop Vote</button>
+    {% endif %}
+
+    <div id="results" style="display: none;">
+        <h4>Results:</h4>
+        <p id="lowest"></p>
+        <p id="highest"></p>
+    </div>
+</div>
+
+<script type="text/javascript">
+    var socket = io();
+
+    function submitVote(value) {
+        socket.emit("submit_vote", {vote: value});
+    }
+
+    function startVote() {
+        socket.emit("start_vote", {});
+    }
+
+    function stopVote() {
+        socket.emit("stop_vote", {});
+    }
+
+    socket.on("voting_results", function(data) {
+        document.getElementById("results").style.display = "block";
+        document.getElementById("lowest").innerText = `Lowest: ${data.lowest.name} (${data.lowest.vote})`;
+        document.getElementById("highest").innerText = `Highest: ${data.highest.name} (${data.highest.vote})`;
+    });
+</script>
+{% endblock %}

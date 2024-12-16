@@ -1,0 +1,17 @@
+{
+    "admin": "Milena",
+    "members": 1,
+    "messages": [],
+    "meeting_title": "Untitled Meeting",
+    "mode": "unanimity",
+    "button_activated": true,
+    "current_task": {
+        "title": "Configurer un serveur",
+        "votes": [
+            {
+                "name": "Ilyna",
+                "vote": 3
+            }
+        ]
+    }
+}
